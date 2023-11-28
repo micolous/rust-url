@@ -8,11 +8,11 @@
 
 //! Data-driven tests imported from web-platform-tests
 
+use serde_json::Value;
 use std::collections::HashMap;
 use std::fmt::Write;
 #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
 use std::sync::Mutex;
-use serde_json::Value;
 use url::Url;
 
 // https://rustwasm.github.io/wasm-bindgen/wasm-bindgen-test/usage.html
