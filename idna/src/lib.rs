@@ -47,11 +47,12 @@ compile_error!("the `alloc` feature must be enabled");
 extern crate assert_matches;
 
 use alloc::string::String;
+use core::fmt;
 
 pub mod punycode;
 mod uts46;
 
-pub use crate::uts46::{Config, Errors, Idna};
+pub use crate::uts46::Idna;
 
 /// The [domain to ASCII](https://url.spec.whatwg.org/#concept-domain-to-ascii) algorithm.
 ///
@@ -60,13 +61,13 @@ pub use crate::uts46::{Config, Errors, Idna};
 /// and using Punycode as necessary.
 ///
 /// This process may fail.
-pub fn domain_to_ascii(domain: &str) -> Result<String, uts46::Errors> {
+pub fn domain_to_ascii(domain: &str) -> Result<String, Errors> {
     Config::default().to_ascii(domain)
 }
 
 /// The [domain to ASCII](https://url.spec.whatwg.org/#concept-domain-to-ascii) algorithm,
 /// with the `beStrict` flag set.
-pub fn domain_to_ascii_strict(domain: &str) -> Result<String, uts46::Errors> {
+pub fn domain_to_ascii_strict(domain: &str) -> Result<String, Errors> {
     Config::default()
         .use_std3_ascii_rules(true)
         .verify_dns_length(true)
@@ -81,6 +82,205 @@ pub fn domain_to_ascii_strict(domain: &str) -> Result<String, uts46::Errors> {
 ///
 /// This may indicate [syntax violations](https://url.spec.whatwg.org/#syntax-violation)
 /// but always returns a string for the mapped domain.
-pub fn domain_to_unicode(domain: &str) -> (String, Result<(), uts46::Errors>) {
+pub fn domain_to_unicode(domain: &str) -> (String, Result<(), Errors>) {
     Config::default().to_unicode(domain)
+}
+
+#[derive(Clone, Copy)]
+#[must_use]
+pub struct Config {
+    use_std3_ascii_rules: bool,
+    transitional_processing: bool,
+    verify_dns_length: bool,
+    check_hyphens: bool,
+    use_idna_2008_rules: bool,
+}
+
+/// The defaults are that of https://url.spec.whatwg.org/#idna
+impl Default for Config {
+    fn default() -> Self {
+        Config {
+            use_std3_ascii_rules: false,
+            transitional_processing: false,
+            check_hyphens: false,
+            // check_bidi: true,
+            // check_joiners: true,
+
+            // Only use for to_ascii, not to_unicode
+            verify_dns_length: false,
+            use_idna_2008_rules: false,
+        }
+    }
+}
+
+impl Config {
+    #[inline]
+    pub fn use_std3_ascii_rules(mut self, value: bool) -> Self {
+        self.use_std3_ascii_rules = value;
+        self
+    }
+
+    #[inline]
+    pub fn transitional_processing(mut self, value: bool) -> Self {
+        self.transitional_processing = value;
+        self
+    }
+
+    #[inline]
+    pub fn verify_dns_length(mut self, value: bool) -> Self {
+        self.verify_dns_length = value;
+        self
+    }
+
+    #[inline]
+    pub fn check_hyphens(mut self, value: bool) -> Self {
+        self.check_hyphens = value;
+        self
+    }
+
+    #[inline]
+    pub fn use_idna_2008_rules(mut self, value: bool) -> Self {
+        self.use_idna_2008_rules = value;
+        self
+    }
+
+    /// http://www.unicode.org/reports/tr46/#ToASCII
+    pub fn to_ascii(self, domain: &str) -> Result<String, Errors> {
+        let mut result = String::with_capacity(domain.len());
+        let mut codec = Idna::new(self);
+        codec.to_ascii(domain, &mut result).map(|()| result)
+    }
+
+    /// http://www.unicode.org/reports/tr46/#ToUnicode
+    pub fn to_unicode(self, domain: &str) -> (String, Result<(), Errors>) {
+        let mut codec = Idna::new(self);
+        let mut out = String::with_capacity(domain.len());
+        let result = codec.to_unicode(domain, &mut out);
+        (out, result)
+    }
+}
+
+/// Errors recorded during UTS #46 processing.
+///
+/// This is opaque for now, indicating what types of errors have been encountered at least once.
+/// More details may be exposed in the future.
+#[derive(Default)]
+pub struct Errors {
+    punycode: bool,
+    check_hyphens: bool,
+    check_bidi: bool,
+    start_combining_mark: bool,
+    invalid_mapping: bool,
+    nfc: bool,
+    disallowed_by_std3_ascii_rules: bool,
+    disallowed_mapped_in_std3: bool,
+    disallowed_character: bool,
+    too_long_for_dns: bool,
+    too_short_for_dns: bool,
+    disallowed_in_idna_2008: bool,
+}
+
+impl Errors {
+    fn is_err(&self) -> bool {
+        let Errors {
+            punycode,
+            check_hyphens,
+            check_bidi,
+            start_combining_mark,
+            invalid_mapping,
+            nfc,
+            disallowed_by_std3_ascii_rules,
+            disallowed_mapped_in_std3,
+            disallowed_character,
+            too_long_for_dns,
+            too_short_for_dns,
+            disallowed_in_idna_2008,
+        } = *self;
+        punycode
+            || check_hyphens
+            || check_bidi
+            || start_combining_mark
+            || invalid_mapping
+            || nfc
+            || disallowed_by_std3_ascii_rules
+            || disallowed_mapped_in_std3
+            || disallowed_character
+            || too_long_for_dns
+            || too_short_for_dns
+            || disallowed_in_idna_2008
+    }
+}
+
+impl fmt::Debug for Errors {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Errors {
+            punycode,
+            check_hyphens,
+            check_bidi,
+            start_combining_mark,
+            invalid_mapping,
+            nfc,
+            disallowed_by_std3_ascii_rules,
+            disallowed_mapped_in_std3,
+            disallowed_character,
+            too_long_for_dns,
+            too_short_for_dns,
+            disallowed_in_idna_2008,
+        } = *self;
+
+        let fields = [
+            ("punycode", punycode),
+            ("check_hyphens", check_hyphens),
+            ("check_bidi", check_bidi),
+            ("start_combining_mark", start_combining_mark),
+            ("invalid_mapping", invalid_mapping),
+            ("nfc", nfc),
+            (
+                "disallowed_by_std3_ascii_rules",
+                disallowed_by_std3_ascii_rules,
+            ),
+            ("disallowed_mapped_in_std3", disallowed_mapped_in_std3),
+            ("disallowed_character", disallowed_character),
+            ("too_long_for_dns", too_long_for_dns),
+            ("too_short_for_dns", too_short_for_dns),
+            ("disallowed_in_idna_2008", disallowed_in_idna_2008),
+        ];
+
+        let mut empty = true;
+        f.write_str("Errors { ")?;
+        for (name, val) in &fields {
+            if *val {
+                if !empty {
+                    f.write_str(", ")?;
+                }
+                f.write_str(name)?;
+                empty = false;
+            }
+        }
+
+        if !empty {
+            f.write_str(" }")
+        } else {
+            f.write_str("}")
+        }
+    }
+}
+
+impl From<Errors> for Result<(), Errors> {
+    fn from(e: Errors) -> Result<(), Errors> {
+        if !e.is_err() {
+            Ok(())
+        } else {
+            Err(e)
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for Errors {}
+
+impl fmt::Display for Errors {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(self, f)
+    }
 }
