@@ -29,6 +29,9 @@ impl Idna {
     pub fn to_ascii(&mut self, domain: &str, out: &mut String) -> Result<(), Errors> {
         let domain_wide = HSTRING::from(domain);
         let mut dwflags = 0;
+        if !self.config.use_idna_2008_rules {
+            dwflags |= IDN_ALLOW_UNASSIGNED;
+        }
         if self.config.use_std3_ascii_rules {
             dwflags |= IDN_USE_STD3_ASCII_RULES;
         }
@@ -70,6 +73,9 @@ impl Idna {
         }
         let domain_wide = HSTRING::from(domain);
         let mut dwflags = 0;
+        if !self.config.use_idna_2008_rules {
+            dwflags |= IDN_ALLOW_UNASSIGNED;
+        }
         if self.config.use_std3_ascii_rules {
             dwflags |= IDN_USE_STD3_ASCII_RULES;
         }
