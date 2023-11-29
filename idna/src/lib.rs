@@ -179,72 +179,50 @@ pub struct Errors {
     too_long_for_dns: bool,
     too_short_for_dns: bool,
     disallowed_in_idna_2008: bool,
+    #[cfg(windows)]
+    windows: Option<windows::core::Error>,
 }
 
 impl Errors {
     fn is_err(&self) -> bool {
-        let Errors {
-            punycode,
-            check_hyphens,
-            check_bidi,
-            start_combining_mark,
-            invalid_mapping,
-            nfc,
-            disallowed_by_std3_ascii_rules,
-            disallowed_mapped_in_std3,
-            disallowed_character,
-            too_long_for_dns,
-            too_short_for_dns,
-            disallowed_in_idna_2008,
-        } = *self;
-        punycode
-            || check_hyphens
-            || check_bidi
-            || start_combining_mark
-            || invalid_mapping
-            || nfc
-            || disallowed_by_std3_ascii_rules
-            || disallowed_mapped_in_std3
-            || disallowed_character
-            || too_long_for_dns
-            || too_short_for_dns
-            || disallowed_in_idna_2008
+        #[cfg(windows)]
+        if self.windows.is_some() {
+            return true;
+        }
+
+        self.punycode
+            || self.check_hyphens
+            || self.check_bidi
+            || self.start_combining_mark
+            || self.invalid_mapping
+            || self.nfc
+            || self.disallowed_by_std3_ascii_rules
+            || self.disallowed_mapped_in_std3
+            || self.disallowed_character
+            || self.too_long_for_dns
+            || self.too_short_for_dns
+            || self.disallowed_in_idna_2008
     }
 }
 
 impl fmt::Debug for Errors {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Errors {
-            punycode,
-            check_hyphens,
-            check_bidi,
-            start_combining_mark,
-            invalid_mapping,
-            nfc,
-            disallowed_by_std3_ascii_rules,
-            disallowed_mapped_in_std3,
-            disallowed_character,
-            too_long_for_dns,
-            too_short_for_dns,
-            disallowed_in_idna_2008,
-        } = *self;
-
         let fields = [
-            ("punycode", punycode),
-            ("check_hyphens", check_hyphens),
-            ("check_bidi", check_bidi),
-            ("start_combining_mark", start_combining_mark),
-            ("invalid_mapping", invalid_mapping),
-            ("nfc", nfc),
+            ("punycode", self.punycode),
+            ("check_hyphens", self.check_hyphens),
+            ("check_bidi", self.check_bidi),
+            ("start_combining_mark", self.start_combining_mark),
+            ("invalid_mapping", self.invalid_mapping),
+            ("nfc", self.nfc),
             (
                 "disallowed_by_std3_ascii_rules",
-                disallowed_by_std3_ascii_rules,
+                self.disallowed_by_std3_ascii_rules,
             ),
-            ("disallowed_mapped_in_std3", disallowed_mapped_in_std3),
-            ("disallowed_character", disallowed_character),
-            ("too_long_for_dns", too_long_for_dns),
-            ("too_short_for_dns", too_short_for_dns),
-            ("disallowed_in_idna_2008", disallowed_in_idna_2008),
+            ("disallowed_mapped_in_std3", self.disallowed_mapped_in_std3),
+            ("disallowed_character", self.disallowed_character),
+            ("too_long_for_dns", self.too_long_for_dns),
+            ("too_short_for_dns", self.too_short_for_dns),
+            ("disallowed_in_idna_2008", self.disallowed_in_idna_2008),
         ];
 
         let mut empty = true;
@@ -257,6 +235,15 @@ impl fmt::Debug for Errors {
                 f.write_str(name)?;
                 empty = false;
             }
+        }
+
+        #[cfg(windows)]
+        if let Some(windows) = &self.windows {
+            if !empty {
+                f.write_str(", ")?;
+            }
+            f.write_fmt(format_args!("windows: {:?}", windows))?;
+            empty = false;
         }
 
         if !empty {

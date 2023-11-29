@@ -2,8 +2,9 @@ use crate::{is_simple, Config, Errors};
 use alloc::{string::String, vec, vec::Vec};
 use windows::{
     core::{HSTRING, PCWSTR, PWSTR},
-    Win32::Globalization::{
-        IdnToAscii, IdnToUnicode, IDN_ALLOW_UNASSIGNED, IDN_USE_STD3_ASCII_RULES,
+    Win32::{
+        Foundation::GetLastError,
+        Globalization::{IdnToAscii, IdnToUnicode, IDN_ALLOW_UNASSIGNED, IDN_USE_STD3_ASCII_RULES},
     },
 };
 
@@ -37,8 +38,7 @@ impl Idna {
 
         if len <= 0 || len > u16::MAX.into() {
             let mut e = Errors::default();
-            e.too_long_for_dns = true;
-            panic!("IdnToAscii buffer too large? {}", len);
+            e.windows = unsafe { GetLastError() }.err();
             return Err(e);
         }
 
@@ -50,8 +50,7 @@ impl Idna {
 
         if len <= 0 || len > (asciicharstr.len() as i32) {
             let mut e = Errors::default();
-            e.too_short_for_dns = true;
-            panic!("IdnToAscii buffer wrong again? {}", len);
+            e.windows = unsafe { GetLastError() }.err();
             return Err(e);
         }
 
@@ -80,8 +79,7 @@ impl Idna {
 
         if len <= 0 || len > u16::MAX.into() {
             let mut e = Errors::default();
-            e.too_long_for_dns = true;
-            panic!("IdnToUnicode Buffer too large? {}", len);
+            e.windows = unsafe { GetLastError() }.err();
             return Err(e);
         }
 
@@ -94,8 +92,7 @@ impl Idna {
 
         if len <= 0 || len > (unicodecharstr.len() as i32) {
             let mut e = Errors::default();
-            e.too_short_for_dns = true;
-            panic!("IdnToUnicode buffer wrong again? {}", len);
+            e.windows = unsafe { GetLastError() }.err();
             return Err(e);
         }
 
