@@ -1,4 +1,5 @@
 use assert_matches::assert_matches;
+#[cfg(not(windows))]
 use unicode_normalization::char::is_combining_mark;
 
 /// https://github.com/servo/rust-url/issues/373
@@ -88,6 +89,7 @@ fn test_v5() {
         .use_std3_ascii_rules(true);
 
     // IdnaTest:784 蔏｡𑰺
+    #[cfg(not(windows))]
     assert!(is_combining_mark('\u{11C3A}'));
     assert!(config.to_ascii("\u{11C3A}").is_err());
     assert!(config.to_ascii("\u{850f}.\u{11C3A}").is_err());

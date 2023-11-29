@@ -10,7 +10,7 @@
 //! (Unicode Technical Standard #46)](http://www.unicode.org/reports/tr46/)
 
 use self::Mapping::*;
-use crate::{punycode, Config, Errors};
+use crate::{punycode, Config, Errors, is_simple};
 
 use alloc::string::String;
 use unicode_bidi::{bidi_class, BidiClass};
@@ -317,41 +317,6 @@ fn check_validity(label: &str, config: Config, errors: &mut Errors) {
     // TODO: Implement rules and add *CheckJoiners* flag.
 
     // V8: Bidi rules are checked inside `processing()`
-}
-
-// Detect simple cases: all lowercase ASCII characters and digits where none
-// of the labels start with PUNYCODE_PREFIX and labels don't start or end with hyphen.
-fn is_simple(domain: &str) -> bool {
-    if domain.is_empty() {
-        return false;
-    }
-    let (mut prev, mut puny_prefix) = ('?', 0);
-    for c in domain.chars() {
-        if c == '.' {
-            if prev == '-' {
-                return false;
-            }
-            puny_prefix = 0;
-            continue;
-        } else if puny_prefix == 0 && c == '-' {
-            return false;
-        } else if puny_prefix < 5 {
-            if c == ['x', 'n', '-', '-'][puny_prefix] {
-                puny_prefix += 1;
-                if puny_prefix == 4 {
-                    return false;
-                }
-            } else {
-                puny_prefix = 5;
-            }
-        }
-        if !c.is_ascii_lowercase() && !c.is_ascii_digit() {
-            return false;
-        }
-        prev = c;
-    }
-
-    true
 }
 
 /// http://www.unicode.org/reports/tr46/#Processing

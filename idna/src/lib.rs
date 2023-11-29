@@ -50,6 +50,7 @@ use alloc::string::String;
 use core::fmt;
 
 pub mod punycode;
+#[cfg_attr(windows, path = "windows.rs")]
 mod uts46;
 
 pub use crate::uts46::Idna;
@@ -283,4 +284,39 @@ impl fmt::Display for Errors {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Debug::fmt(self, f)
     }
+}
+
+// Detect simple cases: all lowercase ASCII characters and digits where none
+// of the labels start with PUNYCODE_PREFIX and labels don't start or end with hyphen.
+pub(crate) fn is_simple(domain: &str) -> bool {
+    if domain.is_empty() {
+        return false;
+    }
+    let (mut prev, mut puny_prefix) = ('?', 0);
+    for c in domain.chars() {
+        if c == '.' {
+            if prev == '-' {
+                return false;
+            }
+            puny_prefix = 0;
+            continue;
+        } else if puny_prefix == 0 && c == '-' {
+            return false;
+        } else if puny_prefix < 5 {
+            if c == ['x', 'n', '-', '-'][puny_prefix] {
+                puny_prefix += 1;
+                if puny_prefix == 4 {
+                    return false;
+                }
+            } else {
+                puny_prefix = 5;
+            }
+        }
+        if !c.is_ascii_lowercase() && !c.is_ascii_digit() {
+            return false;
+        }
+        prev = c;
+    }
+
+    true
 }
